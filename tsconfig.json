@@ -1,0 +1,7 @@
+{
+  // Корневой tsconfig для renderer (Nuxt). Наследует сгенерированный ./.nuxt/tsconfig.json,
+  // где объявлены авто-импорты (computed, reactive, useProfilesStore и т.д.) и алиасы (~/, @/).
+  // Если файл .nuxt/tsconfig.json отсутствует — выполните `npm run postinstall` (nuxt prepare).
+  "extends": "./.nuxt/tsconfig.json",
+  "exclude": ["dist", "dist-electron", ".output", "node_modules", "electron"]
+}

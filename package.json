@@ -1,0 +1,65 @@
+{
+  "name": "s3-ui",
+  "version": "0.1.0",
+  "description": "Простой десктопный UI для управления файлами в S3-совместимом хранилище",
+  "author": "AndreyBAN",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "postinstall": "nuxt prepare",
+    "dev:nuxt": "nuxt dev",
+    "dev:electron": "node scripts/build-electron.mjs --watch",
+    "dev": "concurrently -k -n NUXT,ELECTRON -c cyan,magenta \"npm:dev:nuxt\" \"npm:dev:electron\"",
+    "build:nuxt": "nuxt generate",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run build:nuxt && npm run build:electron",
+    "start": "cross-env NODE_ENV=production electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist:linux": "npm run build && electron-builder --linux deb AppImage",
+    "typecheck": "tsc --noEmit -p tsconfig.electron.json"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.658.0",
+    "@aws-sdk/lib-storage": "^3.658.0",
+    "@aws-sdk/s3-request-presigner": "^3.658.0",
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "@pinia/nuxt": "^0.5.5",
+    "@types/node": "^22.7.0",
+    "concurrently": "^9.0.1",
+    "cross-env": "^7.0.3",
+    "electron": "^43.1.1",
+    "electron-builder": "^25.1.7",
+    "esbuild": "^0.24.0",
+    "nuxt": "^4.0.0",
+    "pinia": "^2.2.4",
+    "typescript": "^5.6.2",
+    "vue": "^3.5.0",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.andreyban.s3ui",
+    "productName": "S3 UI",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist-electron/**/*",
+      ".output/public/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Utility",
+      "maintainer": "AndreyBAN <boriandr92@gmail.com>",
+      "icon": "build/icon.png"
+    },
+    "deb": {
+      "depends": [
+        "libsecret-1-0"
+      ]
+    }
+  }
+}
