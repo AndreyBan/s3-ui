@@ -1,0 +1,79 @@
+name: Build & Release
+
+# Сборка под все три ОС при пуше тега вида v1.2.3 (или v1.2.3-beta),
+# плюс возможность запустить вручную из вкладки Actions.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # electron-builder автоматически собирает таргеты для текущей ОС
+      # (linux: deb+AppImage, windows: nsis+portable, macos: dmg+zip).
+      - name: Build & package
+        run: npm run dist
+        env:
+          # macOS: пропускаем подпись кода (нет сертификата Apple Developer).
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Чтобы не пытаться публиковать через встроенный publisher electron-builder.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.rpm
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Публикуем релиз только когда собрано по тегу.
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          # Тег с суффиксом (например v0.1.0-beta) помечается как pre-release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
