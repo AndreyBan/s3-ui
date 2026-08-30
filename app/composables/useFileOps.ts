@@ -1,4 +1,4 @@
-import type { S3ObjectItem, S3PrefixItem } from '../../shared/types'
+import type { ImageConvertOptions, S3ObjectItem, S3PrefixItem } from '../../shared/types'
 import { api, unwrap } from './useApi'
 
 /** Централизованные операции над файлами: тосты, подтверждения, обновление списка. */
@@ -201,6 +201,25 @@ export function useFileOps() {
     }
   }
 
+  async function convertImages(options: ImageConvertOptions) {
+    try {
+      toast.info('Конвертация запущена…')
+      const r = await unwrap(api().convertImages(files.prefix, options))
+      if (r.total === 0) {
+        toast.info('В этой папке нет jpg/png для конвертации')
+      } else {
+        toast.success(
+          `Готово: создано ${r.converted}, пропущено ${r.skipped}` +
+            (r.deleted ? `, удалено оригиналов ${r.deleted}` : '') +
+            (r.failed ? `, ошибок ${r.failed}` : ''),
+        )
+      }
+      await files.refresh()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ошибка конвертации')
+    }
+  }
+
   return {
     createFolder,
     uploadViaDialog,
@@ -213,5 +232,6 @@ export function useFileOps() {
     deleteSelected,
     rename,
     copyLink,
+    convertImages,
   }
 }

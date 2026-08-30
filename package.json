@@ -1,6 +1,6 @@
 {
   "name": "s3-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Простой десктопный UI для управления файлами в S3-совместимом хранилище",
   "author": "AndreyBAN",
   "license": "MIT",
@@ -48,7 +48,14 @@
     "files": [
       "dist-electron/**/*",
       ".output/public/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
+    "asarUnpack": [
+      "**/*.node",
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
     ],
     "linux": {
       "target": [
@@ -88,5 +95,8 @@
     "dmg": {
       "writeUpdateInfo": false
     }
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
   }
 }

@@ -63,6 +63,26 @@ export interface ProgressEvent {
   error?: string
 }
 
+/** Целевой формат конвертации изображений. */
+export type ImageFormat = 'webp' | 'avif'
+
+/** Параметры рекурсивной конвертации изображений в префиксе. */
+export interface ImageConvertOptions {
+  formats: ImageFormat[] // минимум один
+  quality: number // 1..100
+  optimize: boolean // true → максимальный effort (лучше сжатие, медленнее)
+  deleteOriginals: boolean // удалять исходные jpg/png после успешной конвертации
+}
+
+/** Итоги конвертации. */
+export interface ImageConvertResult {
+  total: number // всего кандидатов jpg/png
+  converted: number // сгенерировано файлов (webp+avif суммарно)
+  skipped: number // цель уже существовала
+  deleted: number // удалено оригиналов
+  failed: number
+}
+
 /** Унифицированный результат IPC-операции с понятной ошибкой. */
 export type IpcResult<T> =
   | { ok: true; data: T }
@@ -110,6 +130,9 @@ export interface S3Api {
 
   // Presigned URL для копирования ссылки
   presignUrl(key: string, expiresInSeconds: number): Promise<IpcResult<string>>
+
+  // Рекурсивная конвертация jpg/png в текущем префиксе в WebP/AVIF
+  convertImages(prefix: string, options: ImageConvertOptions): Promise<IpcResult<ImageConvertResult>>
 
   // Подписка на прогресс операций
   onProgress(cb: (ev: ProgressEvent) => void): () => void

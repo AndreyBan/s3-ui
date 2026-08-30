@@ -15,7 +15,8 @@ const common = {
   sourcemap: watch,
   minify: !watch,
   // Electron предоставляется рантаймом; всё остальное (в т.ч. AWS SDK) инлайним в бандл.
-  external: ['electron'],
+  // sharp — нативный модуль, его нельзя бандлить: грузится из node_modules в рантайме.
+  external: ['electron', 'sharp'],
   logLevel: 'info',
 }
 
