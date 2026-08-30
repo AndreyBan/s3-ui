@@ -64,7 +64,7 @@
       ],
       "category": "Utility",
       "maintainer": "AndreyBAN <boriandr92@gmail.com>",
-      "icon": "build/icon.png"
+      "icon": "build/icons"
     },
     "deb": {
       "depends": [
