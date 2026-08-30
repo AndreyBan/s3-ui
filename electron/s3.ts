@@ -107,8 +107,8 @@ export async function list(
   }
 }
 
-/** Собрать ВСЕ ключи под префиксом (для рекурсивного удаления). */
-async function listAllKeys(profile: S3Profile, prefix: string): Promise<string[]> {
+/** Собрать ВСЕ ключи под префиксом (для рекурсивного удаления/конвертации). */
+export async function listAllKeys(profile: S3Profile, prefix: string): Promise<string[]> {
   const client = getClient(profile)
   const keys: string[] = []
   let token: string | undefined

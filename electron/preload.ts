@@ -35,6 +35,9 @@ const api: S3Api = {
   previewObject: (key) => ipcRenderer.invoke('s3:preview', key),
   presignUrl: (key, expires) => ipcRenderer.invoke('s3:presign', key, expires),
 
+  // Конвертация изображений
+  convertImages: (prefix, options) => ipcRenderer.invoke('s3:convertImages', prefix, options),
+
   // Прогресс
   onProgress: (cb: (ev: ProgressEvent) => void) => {
     const listener = (_e: unknown, ev: ProgressEvent) => cb(ev)

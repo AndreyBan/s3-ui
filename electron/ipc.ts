@@ -2,6 +2,8 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import type {
+  ImageConvertOptions,
+  ImageConvertResult,
   IpcResult,
   ObjectInfo,
   ListResult,
@@ -9,6 +11,7 @@ import type {
   S3ProfileInput,
   S3ProfileMeta,
 } from '../shared/types'
+import * as convert from './convert'
 import * as s3 from './s3'
 import * as store from './store'
 
@@ -211,6 +214,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // ---- Presigned URL ----
   handle<string>('s3:presign', (key: string, expiresInSeconds: number) =>
     s3.presignUrl(requireActiveProfile(), key, expiresInSeconds),
+  )
+
+  // ---- Конвертация изображений (WebP/AVIF) ----
+  handle<ImageConvertResult>('s3:convertImages', (prefix: string, options: ImageConvertOptions) =>
+    convert.convertPrefix(requireActiveProfile(), prefix, options, (ev) =>
+      emitProgress(getWindow(), ev),
+    ),
   )
 }
 

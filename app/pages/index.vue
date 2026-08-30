@@ -9,6 +9,7 @@ const { subscribe } = useUploads()
 
 const previewItem = ref<S3ObjectItem | null>(null)
 const infoItem = ref<S3ObjectItem | null>(null)
+const showConvert = ref(false)
 
 // Навигация к корню, как только появляется активный профиль.
 watch(
@@ -80,6 +81,13 @@ function onKey(e: KeyboardEvent) {
         />
         <button class="btn-ghost" title="Обновить" @click="files.refresh()">↻</button>
         <button class="btn-ghost" @click="ops.createFolder()">📁 Папка</button>
+        <button
+          class="btn-ghost"
+          title="Конвертировать изображения в WebP/AVIF (рекурсивно)"
+          @click="showConvert = true"
+        >
+          🖼 Конвертировать
+        </button>
         <button class="btn-primary" @click="ops.uploadViaDialog()">⬆ Загрузить</button>
         <div class="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
         <button
@@ -121,6 +129,11 @@ function onKey(e: KeyboardEvent) {
     </template>
 
     <FilePreviewModal :item="previewItem" @close="previewItem = null" />
+    <ImageConvertModal
+      :open="showConvert"
+      @close="showConvert = false"
+      @confirm="(o) => { showConvert = false; ops.convertImages(o) }"
+    />
     <UploadProgress />
   </div>
 </template>
