@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { ProgressEvent, S3Api } from '../shared/types'
 
 // Единственный мост в S3. Renderer не имеет доступа к Node/AWS SDK напрямую.
@@ -26,6 +26,12 @@ const api: S3Api = {
   pickFilesToUpload: () => ipcRenderer.invoke('s3:pickFiles'),
   uploadFiles: (destPrefix, filePaths) => ipcRenderer.invoke('s3:upload', destPrefix, filePaths),
   uploadData: (destPrefix, files) => ipcRenderer.invoke('s3:uploadData', destPrefix, files),
+  pickFoldersToUpload: () => ipcRenderer.invoke('s3:pickFolders'),
+  uploadPaths: (destPrefix, paths) => ipcRenderer.invoke('s3:uploadPaths', destPrefix, paths),
+  prefixExists: (prefix) => ipcRenderer.invoke('s3:prefixExists', prefix),
+  clipboardFilePaths: () => ipcRenderer.invoke('clipboard:filePaths'),
+  // as any: в tsconfig.electron нет DOM-lib, тип File недоступен
+  getPathForFile: (file) => webUtils.getPathForFile(file as any),
 
   // Скачивание
   downloadObject: (key) => ipcRenderer.invoke('s3:download', key),

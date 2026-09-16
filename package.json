@@ -1,6 +1,6 @@
 {
   "name": "s3-ui",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Простой десктопный UI для управления файлами в S3-совместимом хранилище",
   "author": "AndreyBAN",
   "license": "MIT",

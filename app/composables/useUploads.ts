@@ -18,7 +18,7 @@ export function useUploads() {
     if (subscribed || !hasBridge()) return
     subscribed = true
     window.s3Api.onProgress((ev: ProgressEvent) => {
-      const name = ev.id.split('/').pop() || ev.id
+      const name = ev.label ?? (ev.id.split('/').pop() || ev.id)
       const idx = transfers.value.findIndex((t) => t.id === ev.id)
       const next: Transfer = {
         id: ev.id,

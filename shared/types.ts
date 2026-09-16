@@ -61,6 +61,13 @@ export interface ProgressEvent {
   total: number
   done: boolean
   error?: string
+  label?: string // отображаемое имя, если id — не ключ S3 (напр. агрегат батча «N из M файлов»)
+}
+
+/** Итог загрузки путей с диска (файлы + папки рекурсивно). */
+export interface UploadPathsResult {
+  uploaded: number // залито файлов
+  markers: number // создано маркеров пустых папок
 }
 
 /** Целевой формат конвертации изображений. */
@@ -120,6 +127,17 @@ export interface S3Api {
   uploadFiles(destPrefix: string, filePaths: string[]): Promise<IpcResult<{ uploaded: number }>>
   // Загрузка содержимого напрямую (drag-and-drop): передаём байты из renderer
   uploadData(destPrefix: string, files: UploadPayload[]): Promise<IpcResult<{ uploaded: number }>>
+  // Загрузка произвольных путей с диска: main сам различает файл/папку, папки обходит рекурсивно
+  pickFoldersToUpload(): Promise<IpcResult<string[]>> // возвращает выбранные папки
+  uploadPaths(destPrefix: string, paths: string[]): Promise<IpcResult<UploadPathsResult>>
+  prefixExists(prefix: string): Promise<IpcResult<boolean>> // есть ли хоть один объект под префиксом
+  // Пути файлов/папок, скопированных в системный буфер обмена ([] — файлов в буфере нет)
+  clipboardFilePaths(): Promise<IpcResult<string[]>>
+  /**
+   * Синхронно: абсолютный путь DOM File на диске ('' — файла на диске нет).
+   * Параметр unknown: типы общие с main-процессом, где нет DOM-lib.
+   */
+  getPathForFile(file: unknown): string
 
   // Скачивание через нативный диалог "Сохранить как"
   downloadObject(key: string): Promise<IpcResult<{ saved: boolean; path?: string }>>

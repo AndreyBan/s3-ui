@@ -209,6 +209,14 @@ export async function exists(profile: S3Profile, key: string): Promise<boolean> 
   }
 }
 
+/** Есть ли хоть один объект под префиксом. HeadObject не видит «папки» без маркера. */
+export async function prefixExists(profile: S3Profile, prefix: string): Promise<boolean> {
+  const res = await getClient(profile).send(
+    new ListObjectsV2Command({ Bucket: profile.bucket, Prefix: prefix, MaxKeys: 1 }),
+  )
+  return (res.KeyCount ?? res.Contents?.length ?? 0) > 0
+}
+
 /** Загрузка одного файла с диска в S3 с колбэком прогресса. */
 export async function uploadFile(
   profile: S3Profile,
