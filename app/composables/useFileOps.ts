@@ -61,13 +61,97 @@ export function useFileOps() {
     }
   }
 
-  /** Загрузка перетащенных файлов (drag-and-drop): читаем байты и шлём в main. */
-  async function uploadDropped(fileList: File[]) {
-    if (!fileList.length) return
-    const existing = fileList.map((f) => f.name)
+  async function uploadFolderViaDialog() {
+    try {
+      const dirs = await unwrap(api().pickFoldersToUpload())
+      if (!dirs.length) return
+      await uploadFromPaths(dirs)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ошибка выбора папки')
+    }
+  }
+
+  /**
+   * Общий пайплайн загрузки путей с диска (файлы и папки): dup-check по basename,
+   * confirm при совпадениях, uploadPaths, обновление списка.
+   */
+  async function uploadFromPaths(paths: string[]) {
+    if (!paths.length) return
+    const existing: string[] = []
+    for (const p of paths) {
+      const name = p.split(/[\\/]/).pop() ?? p
+      // Renderer не знает, файл это или папка — проверяем оба варианта.
+      const dupe =
+        (await unwrap(api().exists(files.prefix + name))) ||
+        (await unwrap(api().prefixExists(files.prefix + name + '/')))
+      if (dupe) existing.push(name)
+    }
+    if (existing.length) {
+      const proceed = await confirm({
+        title: 'Совпадение имён',
+        message:
+          `Уже существуют:\n${existing.join('\n')}\n\n` +
+          'Содержимое папок будет объединено, совпадающие файлы перезаписаны. Продолжить?',
+        confirmLabel: 'Продолжить',
+        danger: true,
+      })
+      if (!proceed) return
+    }
+    try {
+      const { uploaded, markers } = await unwrap(api().uploadPaths(files.prefix, paths))
+      toast.success(
+        `Загружено файлов: ${uploaded}` + (markers ? `, пустых папок: ${markers}` : ''),
+      )
+      await files.refresh()
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ошибка загрузки')
+    }
+  }
+
+  /**
+   * Вставка из буфера обмена (Ctrl+V): файлы/папки, скопированные в файловом менеджере.
+   * Сначала File-объекты из paste-события (Windows/macOS, даёт полный список),
+   * затем чтение буфера в main (Linux: пути/URI из текстового представления).
+   */
+  async function pasteFromClipboard(dt?: DataTransfer | null) {
+    // File-объекты собираем синхронно: после await clipboardData инвалидируется.
+    const paths: string[] = []
+    for (const f of Array.from(dt?.files ?? [])) {
+      const p = api().getPathForFile(f)
+      if (p) paths.push(p)
+    }
+    try {
+      if (!paths.length) paths.push(...(await unwrap(api().clipboardFilePaths())))
+      if (!paths.length) {
+        toast.info('В буфере обмена нет файлов')
+        return
+      }
+      await uploadFromPaths(paths)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Ошибка вставки из буфера')
+    }
+  }
+
+  /** Загрузка перетащенных файлов/папок: по пути с диска, иначе fallback на байты. */
+  async function uploadDropped(items: { file: File; isDirectory: boolean }[]) {
+    if (!items.length) return
+    const paths: string[] = []
+    const noPath: File[] = []
+    for (const item of items) {
+      const p = api().getPathForFile(item.file)
+      if (p) paths.push(p)
+      // Без пути на диске папку не загрузить; файл (напр. картинка из браузера) — байтами.
+      else if (!item.isDirectory) noPath.push(item.file)
+    }
+    await uploadFromPaths(paths)
+    if (noPath.length) await uploadBlobs(noPath)
+  }
+
+  /** Fallback для File без пути на диске: читаем байты и шлём в main. */
+  async function uploadBlobs(fileList: File[]) {
     const dup: string[] = []
-    for (const name of existing) {
-      if (await unwrap(api().exists(files.prefix + name))) dup.push(name)
+    for (const f of fileList) {
+      if (await unwrap(api().exists(files.prefix + f.name))) dup.push(f.name)
     }
     if (dup.length) {
       const proceed = await confirm({
@@ -223,8 +307,10 @@ export function useFileOps() {
   return {
     createFolder,
     uploadViaDialog,
+    uploadFolderViaDialog,
     uploadPaths,
     uploadDropped,
+    pasteFromClipboard,
     download,
     downloadSelected,
     deleteFile,

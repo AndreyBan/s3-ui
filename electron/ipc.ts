@@ -1,5 +1,5 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import { writeFile } from 'node:fs/promises'
+import { stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import type {
   ImageConvertOptions,
@@ -10,10 +10,13 @@ import type {
   ProgressEvent,
   S3ProfileInput,
   S3ProfileMeta,
+  UploadPathsResult,
 } from '../shared/types'
+import { readClipboardFilePaths } from './clipboard'
 import * as convert from './convert'
 import * as s3 from './s3'
 import * as store from './store'
+import { scanDirectory } from './walk'
 
 // Обёртка: любой хендлер возвращает унифицированный IpcResult с понятной ошибкой.
 function handle<T>(
@@ -161,6 +164,68 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       return { uploaded }
     },
   )
+
+  handle<string[]>('s3:pickFolders', async () => {
+    const win = getWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Выберите папки для загрузки',
+      properties: ['openDirectory', 'multiSelections'],
+    })
+    return res.canceled ? [] : res.filePaths
+  })
+
+  handle<boolean>('s3:prefixExists', (prefix: string) =>
+    s3.prefixExists(requireActiveProfile(), prefix),
+  )
+
+  // Универсальная загрузка путей с диска: файлы как есть, папки — рекурсивно
+  // с сохранением структуры (ключ = destPrefix + имяПапки/относительныйПуть).
+  handle<UploadPathsResult>('s3:uploadPaths', async (destPrefix: string, paths: string[]) => {
+    const profile = requireActiveProfile()
+    const win = getWindow()
+
+    // Фаза плана: раскрываем папки в файлы и маркеры пустых директорий.
+    const plan: { absPath: string; key: string }[] = []
+    const markerKeys: string[] = []
+    for (const p of paths) {
+      const st = await stat(p)
+      if (st.isDirectory()) {
+        const root = (destPrefix || '') + basename(p) + '/'
+        const scan = await scanDirectory(p)
+        for (const f of scan.files) plan.push({ absPath: f.absPath, key: root + f.relPath })
+        for (const d of scan.emptyDirs) markerKeys.push(root + d + '/')
+        // Полностью пустая выбранная папка — маркер на неё саму.
+        if (scan.files.length === 0 && scan.emptyDirs.length === 0) markerKeys.push(root)
+      } else {
+        plan.push({ absPath: p, key: (destPrefix || '') + basename(p) })
+      }
+    }
+
+    for (const key of markerKeys) await s3.createFolder(profile, key)
+
+    const total = plan.length
+    const batchId = 'batch:' + Date.now()
+    let uploaded = 0
+    for (const item of plan) {
+      await s3.uploadFile(profile, item.absPath, item.key, (loaded, totalBytes) => {
+        emitProgress(win, { id: item.key, loaded, total: totalBytes, done: false })
+      })
+      emitProgress(win, { id: item.key, loaded: 1, total: 1, done: true })
+      uploaded++
+      if (total > 1) {
+        emitProgress(win, {
+          id: batchId,
+          label: `${uploaded} из ${total} файлов`,
+          loaded: uploaded,
+          total,
+          done: uploaded === total,
+        })
+      }
+    }
+    return { uploaded, markers: markerKeys.length }
+  })
+
+  handle<string[]>('clipboard:filePaths', () => readClipboardFilePaths())
 
   // ---- Скачивание ----
   handle<{ saved: boolean; path?: string }>('s3:download', async (key: string) => {

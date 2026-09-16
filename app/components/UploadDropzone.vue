@@ -18,8 +18,14 @@ function onOver(e: DragEvent) {
 async function onDrop(e: DragEvent) {
   depth = 0
   dragging.value = false
-  const files = Array.from(e.dataTransfer?.files ?? [])
-  if (files.length) await ops.uploadDropped(files)
+  // Собираем строго синхронно: после первого await dataTransfer.items инвалидируется.
+  const dropped = Array.from(e.dataTransfer?.items ?? [])
+    .map((it) => ({
+      file: it.getAsFile(),
+      isDirectory: it.webkitGetAsEntry()?.isDirectory ?? false,
+    }))
+    .filter((d): d is { file: File; isDirectory: boolean } => d.file !== null)
+  if (dropped.length) await ops.uploadDropped(dropped)
 }
 </script>
 

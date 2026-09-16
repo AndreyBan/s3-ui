@@ -23,8 +23,12 @@ watch(
 onMounted(() => {
   subscribe()
   window.addEventListener('keydown', onKey)
+  window.addEventListener('paste', onPaste)
 })
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('paste', onPaste)
+})
 
 function onKey(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement)?.tagName
@@ -38,6 +42,14 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape') {
     files.clearSelection()
   }
+}
+
+// Ctrl+V ловим paste-событием, а не keydown: оно не зависит от раскладки,
+// а clipboardData даёт File-объекты скопированных файлов там, где ОС их отдаёт.
+function onPaste(e: ClipboardEvent) {
+  const el = e.target as HTMLElement | null
+  if (el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return
+  ops.pasteFromClipboard(e.clipboardData)
 }
 </script>
 
@@ -87,6 +99,13 @@ function onKey(e: KeyboardEvent) {
           @click="showConvert = true"
         >
           🖼 Конвертировать
+        </button>
+        <button
+          class="btn-ghost"
+          title="Загрузить папку с сохранением структуры (рекурсивно)"
+          @click="ops.uploadFolderViaDialog()"
+        >
+          ⬆ Папка
         </button>
         <button class="btn-primary" @click="ops.uploadViaDialog()">⬆ Загрузить</button>
         <div class="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
