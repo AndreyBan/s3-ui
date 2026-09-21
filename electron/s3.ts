@@ -282,14 +282,17 @@ export async function getObjectBuffer(
   return { buffer: Buffer.concat(chunks), contentType: res.ContentType }
 }
 
-export async function presignUrl(
-  profile: S3Profile,
-  key: string,
-  expiresInSeconds: number,
-): Promise<string> {
-  return getSignedUrl(
+/**
+ * Прямая ссылка на объект — без подписи и служебных query-параметров.
+ * Presigner используем только как способ получить канонический URL: он сам решает
+ * virtual-hosted/path-style и экранирует ключ. Подпись (всё после '?') отбрасываем.
+ */
+export async function objectUrl(profile: S3Profile, key: string): Promise<string> {
+  const signed = await getSignedUrl(
     getClient(profile),
     new GetObjectCommand({ Bucket: profile.bucket, Key: key }),
-    { expiresIn: expiresInSeconds },
+    { expiresIn: 60 },
   )
+  const q = signed.indexOf('?')
+  return q >= 0 ? signed.slice(0, q) : signed
 }

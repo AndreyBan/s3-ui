@@ -73,7 +73,13 @@ export interface UploadPathsResult {
 /** Целевой формат конвертации изображений. */
 export type ImageFormat = 'webp' | 'avif'
 
-/** Параметры рекурсивной конвертации изображений в префиксе. */
+/** Что конвертировать: отдельные объекты и/или папки (обходятся рекурсивно). */
+export interface ImageConvertTargets {
+  keys: string[] // конкретные объекты; не-jpg/png в списке игнорируются
+  prefixes: string[] // папки, содержимое обходится рекурсивно
+}
+
+/** Параметры конвертации изображений. */
 export interface ImageConvertOptions {
   formats: ImageFormat[] // минимум один
   quality: number // 1..100
@@ -146,11 +152,14 @@ export interface S3Api {
   // Предпросмотр: main отдаёт содержимое объекта (data URL или текст)
   previewObject(key: string): Promise<IpcResult<{ kind: 'image' | 'pdf' | 'text'; content: string; contentType?: string }>>
 
-  // Presigned URL для копирования ссылки
-  presignUrl(key: string, expiresInSeconds: number): Promise<IpcResult<string>>
+  // Прямая ссылка на объект (без подписи и query-параметров)
+  objectUrl(key: string): Promise<IpcResult<string>>
 
-  // Рекурсивная конвертация jpg/png в текущем префиксе в WebP/AVIF
-  convertImages(prefix: string, options: ImageConvertOptions): Promise<IpcResult<ImageConvertResult>>
+  // Конвертация выбранных jpg/png (и содержимого выбранных папок) в WebP/AVIF
+  convertImages(
+    targets: ImageConvertTargets,
+    options: ImageConvertOptions,
+  ): Promise<IpcResult<ImageConvertResult>>
 
   // Подписка на прогресс операций
   onProgress(cb: (ev: ProgressEvent) => void): () => void

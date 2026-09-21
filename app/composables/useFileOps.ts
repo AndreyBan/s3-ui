@@ -185,10 +185,19 @@ export function useFileOps() {
 
   async function downloadSelected() {
     const keys = files.selectedKeys
-    if (!keys.length) return
+    const skippedFolders = files.selectedPrefixes.length
+    if (!keys.length) {
+      toast.info('Скачивание папок не поддерживается — выберите файлы')
+      return
+    }
     try {
       const res = await unwrap(api().downloadObjects(keys))
-      if (res.saved) toast.success(`Сохранено файлов: ${res.saved} → ${res.dir}`)
+      if (res.saved) {
+        toast.success(
+          `Сохранено файлов: ${res.saved} → ${res.dir}` +
+            (skippedFolders ? ` (папок пропущено: ${skippedFolders})` : ''),
+        )
+      }
     } catch (e: any) {
       toast.error(e?.message ?? 'Ошибка скачивания')
     }
@@ -231,17 +240,25 @@ export function useFileOps() {
 
   async function deleteSelected() {
     const keys = files.selectedKeys
-    if (!keys.length) return
+    const prefixes = files.selectedPrefixes
+    if (!keys.length && !prefixes.length) return
+    const parts: string[] = []
+    if (keys.length) parts.push(`файлов: ${keys.length}`)
+    if (prefixes.length) parts.push(`папок со всем содержимым: ${prefixes.length}`)
     const ok = await confirm({
-      title: 'Удалить выбранные файлы?',
-      message: `Будет удалено файлов: ${keys.length}`,
+      title: 'Удалить выбранное?',
+      message: `Будет удалено ${parts.join(', ')}`,
       confirmLabel: 'Удалить',
       danger: true,
     })
     if (!ok) return
     try {
-      const { deleted } = await unwrap(api().deleteObjects(keys))
-      toast.success(`Удалено файлов: ${deleted}`)
+      let deleted = 0
+      if (keys.length) deleted += (await unwrap(api().deleteObjects(keys))).deleted
+      for (const prefix of prefixes) {
+        deleted += (await unwrap(api().deletePrefix(prefix))).deleted
+      }
+      toast.success(`Удалено объектов: ${deleted}`)
       files.clearSelection()
       await files.refresh()
     } catch (e: any) {
@@ -277,20 +294,23 @@ export function useFileOps() {
 
   async function copyLink(item: S3ObjectItem) {
     try {
-      const url = await unwrap(api().presignUrl(item.key, 3600))
+      const url = await unwrap(api().objectUrl(item.key))
       await navigator.clipboard.writeText(url)
-      toast.success('Ссылка (1 час) скопирована в буфер')
+      toast.success('Ссылка скопирована в буфер')
     } catch (e: any) {
       toast.error(e?.message ?? 'Не удалось создать ссылку')
     }
   }
 
-  async function convertImages(options: ImageConvertOptions) {
+  /** Конвертация выбранного: папки — рекурсивно, файлы — поштучно. */
+  async function convertSelected(options: ImageConvertOptions) {
+    const targets = { keys: files.selectedKeys, prefixes: files.selectedPrefixes }
+    if (!targets.keys.length && !targets.prefixes.length) return
     try {
       toast.info('Конвертация запущена…')
-      const r = await unwrap(api().convertImages(files.prefix, options))
+      const r = await unwrap(api().convertImages(targets, options))
       if (r.total === 0) {
-        toast.info('В этой папке нет jpg/png для конвертации')
+        toast.info('Среди выбранного нет jpg/png для конвертации')
       } else {
         toast.success(
           `Готово: создано ${r.converted}, пропущено ${r.skipped}` +
@@ -298,6 +318,7 @@ export function useFileOps() {
             (r.failed ? `, ошибок ${r.failed}` : ''),
         )
       }
+      files.clearSelection()
       await files.refresh()
     } catch (e: any) {
       toast.error(e?.message ?? 'Ошибка конвертации')
@@ -318,6 +339,6 @@ export function useFileOps() {
     deleteSelected,
     rename,
     copyLink,
-    convertImages,
+    convertSelected,
   }
 }

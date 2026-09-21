@@ -15,7 +15,10 @@ function onRowClick(item: S3ObjectItem, e: MouseEvent) {
 }
 
 const allSelected = computed(
-  () => files.filteredFiles.length > 0 && files.filteredFiles.every((f) => files.isSelected(f.key)),
+  () =>
+    files.filteredFiles.length + files.filteredFolders.length > 0 &&
+    files.filteredFiles.every((f) => files.isSelected(f.key)) &&
+    files.filteredFolders.every((f) => files.isFolderSelected(f.prefix)),
 )
 function toggleAll() {
   if (allSelected.value) files.clearSelection()
@@ -53,9 +56,16 @@ function toggleAll() {
           v-for="folder in files.filteredFolders"
           :key="folder.prefix"
           class="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+          :class="{ 'bg-indigo-50 dark:bg-indigo-950/40': files.isFolderSelected(folder.prefix) }"
           @dblclick="files.navigate(folder.prefix)"
         >
-          <td class="px-3 py-2"></td>
+          <td class="px-3 py-2">
+            <input
+              type="checkbox"
+              :checked="files.isFolderSelected(folder.prefix)"
+              @click.stop="files.toggleSelectFolder(folder.prefix)"
+            />
+          </td>
           <td class="px-3 py-2" @click="files.navigate(folder.prefix)">
             <span class="flex items-center gap-2 font-medium">📁 {{ folder.name }}</span>
           </td>
@@ -101,16 +111,22 @@ function toggleAll() {
 
     <!-- GRID -->
     <div v-else class="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      <button
+      <div
         v-for="folder in files.filteredFolders"
         :key="folder.prefix"
-        class="card flex flex-col items-center gap-2 p-4 hover:border-indigo-400"
-        @dblclick="files.navigate(folder.prefix)"
+        class="card relative flex cursor-pointer flex-col items-center gap-2 p-4 hover:border-indigo-400"
+        :class="{ 'ring-2 ring-indigo-500': files.isFolderSelected(folder.prefix) }"
         @click="files.navigate(folder.prefix)"
       >
+        <input
+          type="checkbox"
+          class="absolute left-2 top-2"
+          :checked="files.isFolderSelected(folder.prefix)"
+          @click.stop="files.toggleSelectFolder(folder.prefix)"
+        />
         <span class="text-4xl">📁</span>
         <span class="w-full truncate text-center text-xs">{{ folder.name }}</span>
-      </button>
+      </div>
       <div
         v-for="item in files.filteredFiles"
         :key="item.key"

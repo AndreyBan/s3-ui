@@ -95,13 +95,6 @@ function onPaste(e: ClipboardEvent) {
         <button class="btn-ghost" @click="ops.createFolder()">📁 Папка</button>
         <button
           class="btn-ghost"
-          title="Конвертировать изображения в WebP/AVIF (рекурсивно)"
-          @click="showConvert = true"
-        >
-          🖼 Конвертировать
-        </button>
-        <button
-          class="btn-ghost"
           title="Загрузить папку с сохранением структуры (рекурсивно)"
           @click="ops.uploadFolderViaDialog()"
         >
@@ -126,6 +119,13 @@ function onPaste(e: ClipboardEvent) {
         <span class="font-medium">Выбрано: {{ files.selectedCount }}</span>
         <div class="flex-1" />
         <button class="btn-ghost" @click="ops.downloadSelected()">⬇ Скачать</button>
+        <button
+          class="btn-ghost"
+          title="Конвертировать выбранные jpg/png в WebP/AVIF (папки — рекурсивно)"
+          @click="showConvert = true"
+        >
+          🖼 Конвертировать
+        </button>
         <button class="btn-danger !py-1.5" @click="ops.deleteSelected()">🗑 Удалить</button>
         <button class="btn-ghost" @click="files.clearSelection()">Снять выбор</button>
       </div>
@@ -151,7 +151,7 @@ function onPaste(e: ClipboardEvent) {
     <ImageConvertModal
       :open="showConvert"
       @close="showConvert = false"
-      @confirm="(o) => { showConvert = false; ops.convertImages(o) }"
+      @confirm="(o) => { showConvert = false; ops.convertSelected(o) }"
     />
     <UploadProgress />
   </div>

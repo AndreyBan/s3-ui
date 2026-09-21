@@ -54,8 +54,8 @@ function confirm() {
         <div class="card w-full max-w-md p-6">
           <h3 class="text-lg font-semibold">Конвертировать изображения</h3>
           <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Рекурсивно обрабатываются jpg/png в текущей папке и вложенных. Уже
-            сконвертированные файлы пропускаются.
+            Обрабатываются выбранные jpg/png; выбранные папки — рекурсивно. Остальные
+            файлы и уже сконвертированные пропускаются.
           </p>
 
           <div class="mt-5 space-y-4">
