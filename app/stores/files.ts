@@ -12,6 +12,7 @@ export const useFilesStore = defineStore('files', {
     loading: false,
     error: '' as string,
     selection: new Set<string>(), // выбранные ключи файлов
+    folderSelection: new Set<string>(), // выбранные префиксы папок
     lastClickedKey: null as string | null, // для shift-select диапазона
     viewMode: 'list' as 'list' | 'grid',
     filter: '' as string, // фильтр по имени в текущей папке
@@ -39,7 +40,8 @@ export const useFilesStore = defineStore('files', {
       return s.files.filter((f) => f.name.toLowerCase().includes(q))
     },
     selectedKeys: (s): string[] => Array.from(s.selection),
-    selectedCount: (s): number => s.selection.size,
+    selectedPrefixes: (s): string[] => Array.from(s.folderSelection),
+    selectedCount: (s): number => s.selection.size + s.folderSelection.size,
   },
   actions: {
     async navigate(prefix: string) {
@@ -98,15 +100,24 @@ export const useFilesStore = defineStore('files', {
       for (let i = a; i <= b; i++) this.selection.add(keys[i]!)
       this.lastClickedKey = key
     },
+    toggleSelectFolder(prefix: string) {
+      if (this.folderSelection.has(prefix)) this.folderSelection.delete(prefix)
+      else this.folderSelection.add(prefix)
+    },
     selectAll() {
       for (const f of this.filteredFiles) this.selection.add(f.key)
+      for (const f of this.filteredFolders) this.folderSelection.add(f.prefix)
     },
     clearSelection() {
       this.selection.clear()
+      this.folderSelection.clear()
       this.lastClickedKey = null
     },
     isSelected(key: string): boolean {
       return this.selection.has(key)
+    },
+    isFolderSelected(prefix: string): boolean {
+      return this.folderSelection.has(prefix)
     },
   },
 })

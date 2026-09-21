@@ -3,6 +3,7 @@ import { extname } from 'node:path'
 import type {
   ImageConvertOptions,
   ImageConvertResult,
+  ImageConvertTargets,
   ImageFormat,
   ProgressEvent,
   S3Profile,
@@ -25,15 +26,21 @@ function effortFor(format: ImageFormat, optimize: boolean): number {
   return optimize ? 6 : 4 // webp: 0..6
 }
 
+/** Подходит ли ключ под конвертацию (изображение, а не маркер папки). */
+function isSource(key: string): boolean {
+  return !key.endsWith('/') && SOURCE_EXT.has(extname(key).toLowerCase())
+}
+
 /**
- * Рекурсивно конвертирует jpg/png под префиксом в выбранные форматы (WebP/AVIF).
+ * Конвертирует выбранные jpg/png в заданные форматы (WebP/AVIF): папки из targets
+ * обходятся рекурсивно, отдельные ключи берутся как есть (прочие форматы игнорируются).
  * Работает транзитом в памяти: скачал → сконвертировал → загрузил. На локальный диск
  * ничего не пишется. Пропускает те цели, что уже существуют. По желанию удаляет
  * оригиналы после успешной генерации.
  */
-export async function convertPrefix(
+export async function convertTargets(
   profile: S3Profile,
-  prefix: string,
+  targets: ImageConvertTargets,
   options: ImageConvertOptions,
   onProgress?: (ev: ProgressEvent) => void,
 ): Promise<ImageConvertResult> {
@@ -41,16 +48,30 @@ export async function convertPrefix(
   if (formats.length === 0) throw new Error('Не выбран ни один формат для конвертации.')
   const quality = Math.min(100, Math.max(1, Math.round(options.quality)))
 
-  const allKeys = await s3.listAllKeys(profile, prefix)
-  const existing = new Set(allKeys)
+  // Листинг выбранных папок заодно даёт полную картину уже существующих целей в них.
+  const scanned: string[] = []
+  const existing = new Set<string>()
+  const candidates = new Set<string>()
 
-  // Кандидаты: файлы-изображения (не маркеры папок).
-  const candidates = allKeys.filter(
-    (k) => !k.endsWith('/') && SOURCE_EXT.has(extname(k).toLowerCase()),
-  )
+  for (const prefix of targets.prefixes ?? []) {
+    const norm = prefix.endsWith('/') ? prefix : prefix + '/'
+    scanned.push(norm)
+    for (const key of await s3.listAllKeys(profile, norm)) {
+      existing.add(key)
+      if (isSource(key)) candidates.add(key)
+    }
+  }
+  for (const key of targets.keys ?? []) if (isSource(key)) candidates.add(key)
+
+  /** Цель уже есть? Внутри обойдённых папок листинг исчерпывающий, иначе — HEAD. */
+  async function destTaken(dest: string): Promise<boolean> {
+    if (existing.has(dest)) return true
+    if (scanned.some((p) => dest.startsWith(p))) return false
+    return s3.exists(profile, dest)
+  }
 
   const result: ImageConvertResult = {
-    total: candidates.length,
+    total: candidates.size,
     converted: 0,
     skipped: 0,
     deleted: 0,
@@ -64,11 +85,11 @@ export async function convertPrefix(
 
     for (const format of formats) {
       const dest = targetKey(key, format)
-      if (existing.has(dest)) {
-        result.skipped++
-        continue
-      }
       try {
+        if (await destTaken(dest)) {
+          result.skipped++
+          continue
+        }
         if (!buffer) {
           const got = await s3.getObjectBuffer(profile, key)
           buffer = got.buffer

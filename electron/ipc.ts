@@ -4,6 +4,7 @@ import { basename, extname, join } from 'node:path'
 import type {
   ImageConvertOptions,
   ImageConvertResult,
+  ImageConvertTargets,
   IpcResult,
   ObjectInfo,
   ListResult,
@@ -276,16 +277,16 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     },
   )
 
-  // ---- Presigned URL ----
-  handle<string>('s3:presign', (key: string, expiresInSeconds: number) =>
-    s3.presignUrl(requireActiveProfile(), key, expiresInSeconds),
-  )
+  // ---- Прямая ссылка на объект ----
+  handle<string>('s3:objectUrl', (key: string) => s3.objectUrl(requireActiveProfile(), key))
 
   // ---- Конвертация изображений (WebP/AVIF) ----
-  handle<ImageConvertResult>('s3:convertImages', (prefix: string, options: ImageConvertOptions) =>
-    convert.convertPrefix(requireActiveProfile(), prefix, options, (ev) =>
-      emitProgress(getWindow(), ev),
-    ),
+  handle<ImageConvertResult>(
+    's3:convertImages',
+    (targets: ImageConvertTargets, options: ImageConvertOptions) =>
+      convert.convertTargets(requireActiveProfile(), targets, options, (ev) =>
+        emitProgress(getWindow(), ev),
+      ),
   )
 }
 
