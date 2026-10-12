@@ -71,26 +71,26 @@ export interface UploadPathsResult {
 }
 
 /** Целевой формат конвертации изображений. */
-export type ImageFormat = 'webp' | 'avif'
+export type ImageFormat = 'webp' | 'avif' | 'png'
 
 /** Что конвертировать: отдельные объекты и/или папки (обходятся рекурсивно). */
 export interface ImageConvertTargets {
-  keys: string[] // конкретные объекты; не-jpg/png в списке игнорируются
+  keys: string[] // конкретные объекты; неподходящие форматы в списке игнорируются
   prefixes: string[] // папки, содержимое обходится рекурсивно
 }
 
 /** Параметры конвертации изображений. */
 export interface ImageConvertOptions {
   formats: ImageFormat[] // минимум один
-  quality: number // 1..100
+  quality: number // 1..100 (для PNG не используется — он без потерь)
   optimize: boolean // true → максимальный effort (лучше сжатие, медленнее)
-  deleteOriginals: boolean // удалять исходные jpg/png после успешной конвертации
+  deleteOriginals: boolean // удалять исходники после успешной конвертации
 }
 
 /** Итоги конвертации. */
 export interface ImageConvertResult {
-  total: number // всего кандидатов jpg/png
-  converted: number // сгенерировано файлов (webp+avif суммарно)
+  total: number // всего исходных изображений-кандидатов
+  converted: number // сгенерировано файлов (по всем форматам суммарно)
   skipped: number // цель уже существовала
   deleted: number // удалено оригиналов
   failed: number
@@ -155,7 +155,7 @@ export interface S3Api {
   // Прямая ссылка на объект (без подписи и query-параметров)
   objectUrl(key: string): Promise<IpcResult<string>>
 
-  // Конвертация выбранных jpg/png (и содержимого выбранных папок) в WebP/AVIF
+  // Конвертация выбранных изображений (и содержимого выбранных папок): jpg/png → WebP/AVIF, webp → AVIF/PNG
   convertImages(
     targets: ImageConvertTargets,
     options: ImageConvertOptions,

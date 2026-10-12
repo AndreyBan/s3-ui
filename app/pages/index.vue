@@ -121,7 +121,7 @@ function onPaste(e: ClipboardEvent) {
         <button class="btn-ghost" @click="ops.downloadSelected()">⬇ Скачать</button>
         <button
           class="btn-ghost"
-          title="Конвертировать выбранные jpg/png в WebP/AVIF (папки — рекурсивно)"
+          title="Конвертировать изображения: jpg/png → WebP/AVIF, webp → AVIF/PNG (папки — рекурсивно)"
           @click="showConvert = true"
         >
           🖼 Конвертировать

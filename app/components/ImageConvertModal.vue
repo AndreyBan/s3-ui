@@ -9,11 +9,12 @@ const emit = defineEmits<{
 
 const webp = ref(true)
 const avif = ref(false)
+const png = ref(false)
 const quality = ref(80)
 const optimize = ref(true)
 const deleteOriginals = ref(false)
 
-const canConfirm = computed(() => webp.value || avif.value)
+const canConfirm = computed(() => webp.value || avif.value || png.value)
 
 // Сброс к значениям по умолчанию при каждом открытии.
 watch(
@@ -22,6 +23,7 @@ watch(
     if (open) {
       webp.value = true
       avif.value = false
+      png.value = false
       quality.value = 80
       optimize.value = true
       deleteOriginals.value = false
@@ -34,6 +36,7 @@ function confirm() {
   const formats: ImageFormat[] = []
   if (webp.value) formats.push('webp')
   if (avif.value) formats.push('avif')
+  if (png.value) formats.push('png')
   emit('confirm', {
     formats,
     quality: quality.value,
@@ -54,8 +57,8 @@ function confirm() {
         <div class="card w-full max-w-md p-6">
           <h3 class="text-lg font-semibold">Конвертировать изображения</h3>
           <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Обрабатываются выбранные jpg/png; выбранные папки — рекурсивно. Остальные
-            файлы и уже сконвертированные пропускаются.
+            jpg/png → WebP/AVIF, webp → AVIF/PNG; выбранные папки — рекурсивно.
+            Остальные файлы и уже сконвертированные пропускаются.
           </p>
 
           <div class="mt-5 space-y-4">
@@ -67,6 +70,10 @@ function confirm() {
                 </label>
                 <label class="flex items-center gap-2 text-sm">
                   <input v-model="avif" type="checkbox" class="h-4 w-4" /> AVIF
+                </label>
+                <label class="flex items-center gap-2 text-sm" title="Только из WebP, без потерь">
+                  <input v-model="png" type="checkbox" class="h-4 w-4" /> PNG
+                  <span class="text-xs text-slate-500 dark:text-slate-400">(из WebP)</span>
                 </label>
               </div>
             </div>
@@ -92,7 +99,7 @@ function confirm() {
 
             <label class="flex items-center gap-2 text-sm text-rose-600 dark:text-rose-400">
               <input v-model="deleteOriginals" type="checkbox" class="h-4 w-4" />
-              Удалить оригиналы (jpg/png) после конвертации
+              Удалить оригиналы после конвертации
             </label>
           </div>
 

@@ -10,8 +10,13 @@ import type {
 } from '../shared/types'
 import * as s3 from './s3'
 
-// Исходные форматы, которые умеем конвертировать.
-const SOURCE_EXT = new Set(['.jpg', '.jpeg', '.png'])
+// Какие целевые форматы допустимы для каждого исходного расширения.
+const CONVERSIONS: Record<string, ImageFormat[]> = {
+  '.jpg': ['webp', 'avif'],
+  '.jpeg': ['webp', 'avif'],
+  '.png': ['webp', 'avif'],
+  '.webp': ['avif', 'png'],
+}
 
 /** Заменить расширение ключа на целевое (напр. a/b/pic.jpg → a/b/pic.webp). */
 function targetKey(key: string, format: ImageFormat): string {
@@ -20,19 +25,24 @@ function targetKey(key: string, format: ImageFormat): string {
   return `${base}.${format}`
 }
 
-/** Уровень усилия сжатия для формата. */
-function effortFor(format: ImageFormat, optimize: boolean): number {
-  if (format === 'avif') return optimize ? 6 : 4 // avif: 0..9
-  return optimize ? 6 : 4 // webp: 0..6
+/** Кодирует изображение в целевой формат. PNG — без потерь, quality к нему не применяется. */
+function encode(input: Buffer, format: ImageFormat, quality: number, optimize: boolean): Promise<Buffer> {
+  const img = sharp(input)
+  if (format === 'png') return img.png({ compressionLevel: optimize ? 9 : 6 }).toBuffer()
+  // effort: avif 0..9, webp 0..6
+  return img[format]({ quality, effort: optimize ? 6 : 4 }).toBuffer()
 }
 
-/** Подходит ли ключ под конвертацию (изображение, а не маркер папки). */
-function isSource(key: string): boolean {
-  return !key.endsWith('/') && SOURCE_EXT.has(extname(key).toLowerCase())
+/** Целевые форматы для ключа из запрошенных; пусто — ключ не конвертируется (в т.ч. маркер папки). */
+function formatsFor(key: string, requested: ImageFormat[]): ImageFormat[] {
+  if (key.endsWith('/')) return []
+  const allowed = CONVERSIONS[extname(key).toLowerCase()] ?? []
+  return requested.filter((f) => allowed.includes(f))
 }
 
 /**
- * Конвертирует выбранные jpg/png в заданные форматы (WebP/AVIF): папки из targets
+ * Конвертирует выбранные изображения в заданные форматы: jpg/png → WebP/AVIF,
+ * webp → AVIF/PNG (см. CONVERSIONS). Папки из targets
  * обходятся рекурсивно, отдельные ключи берутся как есть (прочие форматы игнорируются).
  * Работает транзитом в памяти: скачал → сконвертировал → загрузил. На локальный диск
  * ничего не пишется. Пропускает те цели, что уже существуют. По желанию удаляет
@@ -44,7 +54,7 @@ export async function convertTargets(
   options: ImageConvertOptions,
   onProgress?: (ev: ProgressEvent) => void,
 ): Promise<ImageConvertResult> {
-  const formats = options.formats.filter((f): f is ImageFormat => f === 'webp' || f === 'avif')
+  const formats = options.formats.filter((f): f is ImageFormat => f === 'webp' || f === 'avif' || f === 'png')
   if (formats.length === 0) throw new Error('Не выбран ни один формат для конвертации.')
   const quality = Math.min(100, Math.max(1, Math.round(options.quality)))
 
@@ -58,10 +68,10 @@ export async function convertTargets(
     scanned.push(norm)
     for (const key of await s3.listAllKeys(profile, norm)) {
       existing.add(key)
-      if (isSource(key)) candidates.add(key)
+      if (formatsFor(key, formats).length) candidates.add(key)
     }
   }
-  for (const key of targets.keys ?? []) if (isSource(key)) candidates.add(key)
+  for (const key of targets.keys ?? []) if (formatsFor(key, formats).length) candidates.add(key)
 
   /** Цель уже есть? Внутри обойдённых папок листинг исчерпывающий, иначе — HEAD. */
   async function destTaken(dest: string): Promise<boolean> {
@@ -83,7 +93,7 @@ export async function convertTargets(
     let buffer: Buffer | null = null
     let producedAny = false
 
-    for (const format of formats) {
+    for (const format of formatsFor(key, formats)) {
       const dest = targetKey(key, format)
       try {
         if (await destTaken(dest)) {
@@ -95,10 +105,7 @@ export async function convertTargets(
           buffer = got.buffer
         }
         onProgress?.({ id: dest, loaded: 0, total: 1, done: false })
-        const out = await sharp(buffer)[format]({
-          quality,
-          effort: effortFor(format, options.optimize),
-        }).toBuffer()
+        const out = await encode(buffer, format, quality, options.optimize)
         await s3.uploadBuffer(profile, out, dest, (loaded, total) => {
           onProgress?.({ id: dest, loaded, total, done: false })
         })
