@@ -280,7 +280,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // ---- Прямая ссылка на объект ----
   handle<string>('s3:objectUrl', (key: string) => s3.objectUrl(requireActiveProfile(), key))
 
-  // ---- Конвертация изображений (WebP/AVIF) ----
+  // ---- Конвертация изображений (WebP/AVIF/PNG) ----
   handle<ImageConvertResult>(
     's3:convertImages',
     (targets: ImageConvertTargets, options: ImageConvertOptions) =>
